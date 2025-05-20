@@ -1,0 +1,95 @@
+---
+- name: Deploy Dockerized Node.js App
+  hosts: ec2_instance
+  become: yes
+
+  tasks:
+    - name: Update system
+      apt:
+        update_cache: yes
+    
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Pull Docker Image
+      command: docker pull akashs2002/test-image:latest
+
+    - name: Remove the container 
+      command: docker rm -f my-node-container
+
+    - name: Run Docker Container
+      command: docker run -d -p 3000:3000 --name my-node-container akashs2002/test-image:latest
+ 
+    - name: Update system
+      apt:
+        update_cache: yes
+    
+    - name: Install required packages for SSL
+      apt:
+        name:
+          - nginx
+          - certbot
+          - python3-certbot-nginx
+        state: present
+
+          #    - name: Generate NGINX config from template
+          #      template:
+          #        src: "./nginx_proxy.conf.j2"
+          #        dest: "/etc/nginx/sites-available/nginx_proxy.conf"
+          #      notify: Reload NGINX
+          #      when: domain_name is defined
+
+    - name: Remove default NGINX site config if present
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Enable NGINX site config
+      file:
+        src: "/etc/nginx/sites-available/nginx_proxy.conf"
+        dest: "/etc/nginx/sites-enabled/nginx_proxy.conf"
+        state: link
+        force: yes
+      notify: Reload NGINX
+
+    - name: Get instance public IP
+      command: curl -s http://checkip.amazonaws.com
+      register: public_ip
+      changed_when: false
+
+    - name: Set domain name using nip.io
+      set_fact:
+         domain_name: "{{ public_ip.stdout }}.nip.io"
+    
+    - name: Generate NGINX config from template
+      template:
+        src: "./nginx_proxy.conf.j2"
+        dest: "/etc/nginx/sites-available/nginx_proxy.conf"
+      notify: Reload NGINX
+
+    - name: Obtain SSL certificate for dynamic domain
+      command: >
+        certbot --nginx -n --redirect
+        --agree-tos
+        --register-unsafely-without-email
+        -d {{ domain_name }}
+      notify: Reload NGINX
+
+    - name: Show the public domain name
+      debug:
+        msg: "Your app is accessible at https://{{ domain_name }}"
+        
+  handlers:
+    - name: Reload NGINX
+      service:
+        name: nginx
+        state: reloaded  
+

@@ -1,0 +1,9 @@
+
+# Terraform state and secrets
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/.terraform/
+terraform/crash.log
+terraform/*.backup
+terraform/.terraform.lock.hcl
+
