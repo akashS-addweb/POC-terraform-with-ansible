@@ -76,9 +76,12 @@
         -d {{ domain_name }}
       notify: Reload NGINX
 
-    - name: Show the public domain name
-      debug:
-        msg: "Your app is accessible at https://{{ domain_name }}"
+    - name: Write domain name to a local file on host
+      local_action:
+        module: copy
+        content: "https://{{ domain_name }}\n"
+        dest: "../domain_name.txt"
+     
         
   handlers:
     - name: Reload NGINX
